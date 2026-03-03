@@ -1,0 +1,98 @@
+/*
+ * CH32V003 LED Controller - Optimized for small flash
+ * LEDs 5-8: Breathing effect (10 second period)
+ * LEDs 1-4: Sequential chase (100ms each, 1s off, repeat)
+ */
+
+// Pin definitions - adjust to your board
+#define LED1 0
+#define LED2 1
+#define LED3 2
+#define LED4 3
+#define LED5 4
+#define LED6 5
+#define LED7 6
+#define LED8 7
+
+// Timing constants
+#define STEP_TIME 100
+#define CYCLE_PAUSE 1000
+#define BREATH_PERIOD 10000
+
+unsigned long lastChaseUpdate = 0;
+unsigned long lastBreathUpdate = 0;
+unsigned long chaseStartTime = 0;
+unsigned long breathStartTime = 0;
+byte chaseStep = 0;
+byte breathBrightness = 0;
+byte breathDirection = 1; // 1 = increasing, 0 = decreasing
+
+void setup() {
+  // Initialize pins
+  for (byte i = 0; i < 8; i++) {
+    pinMode(i, OUTPUT);
+    digitalWrite(i, LOW);
+  }
+  
+  breathStartTime = millis();
+  chaseStartTime = millis();
+}
+
+void loop() {
+  unsigned long now = millis();
+  
+  // Handle chase pattern (LEDs 1-4)
+  if (now - lastChaseUpdate >= 10) { // Check every 10ms
+    lastChaseUpdate = now;
+    handleChase(now);
+  }
+  
+  // Handle breathing (LEDs 5-8)
+  if (now - lastBreathUpdate >= 39) { // ~256 steps in 10 seconds
+    lastBreathUpdate = now;
+    handleBreath();
+  }
+}
+
+void handleChase(unsigned long now) {
+  unsigned long elapsed = now - chaseStartTime;
+  unsigned long cyclePos = elapsed % 1400; // 1400ms total cycle
+  
+  // Turn off all first
+  for (byte i = 0; i < 4; i++) {
+    digitalWrite(i, LOW);
+  }
+  
+  // Turn on appropriate LED
+  if (cyclePos < 100) {
+    digitalWrite(LED1, HIGH);
+  } else if (cyclePos < 200) {
+    digitalWrite(LED2, HIGH);
+  } else if (cyclePos < 300) {
+    digitalWrite(LED3, HIGH);
+  } else if (cyclePos < 400) {
+    digitalWrite(LED4, HIGH);
+  }
+  // 400-1400ms: all off
+}
+
+void handleBreath() {
+  // Simple triangular wave breathing (no floating point)
+  if (breathDirection) {
+    breathBrightness++;
+    if (breathBrightness >= 255) {
+      breathBrightness = 255;
+      breathDirection = 0;
+    }
+  } else {
+    breathBrightness--;
+    if (breathBrightness == 0) {
+      breathDirection = 1;
+    }
+  }
+  
+  // Apply to LEDs 5-8
+  for (byte i = 4; i < 8; i++) {
+    analogWrite(i, breathBrightness);
+  }
+}
